@@ -63,7 +63,7 @@ Below are the code to drive the above model from different interfaces.
 
 ## `cmdstanpy`
 
-``` {.python language="python" style="lgeneral"}
+``` {.python language="Python" style="lgeneral"}
 from cmdstanpy import CmdStanModel
 model = CmdStanModel(stan_file='bernoulli_example.stan', compile=False)
 model.compile(user_header='external.hpp')
@@ -129,7 +129,25 @@ Usually, in a project we will have many a number of model files that all depend 
 
 In `Python`
 
-``` {.python language="python" style="lgeneral"}
+``` {.py language="python" style="lgeneral"}
+import re
+def change_namespace(stan_name, user_header):
+    """Change the namespace name in the user header file.
+
+    Args:
+        stan_name (str): desired Stan file name
+        user_header (str): path to user header file
+    """
+    with open(user_header, 'r') as file:
+        content = file.read()
+    new_content = re.sub(r'^namespace \S+_model_namespace {',
+                         f'namespace {stan_name}_model_namespace {{', 
+                         content, flags=re.MULTILINE)
+    with open(user_header, 'w') as file:
+        file.write(new_content)
+```
+
+``` {.python language="py" style="lgeneral"}
 import re
 def change_namespace(stan_name, user_header):
     """Change the namespace name in the user header file.
@@ -178,9 +196,9 @@ $$\begin{aligned}
 where we treat the probability of failure $p$ as a random variable with a beta distribution with parameters $\alpha$ and $\beta$. Then the marginal distribution of $Y$ is given by
 
 $$\begin{aligned}
-  f(y|r, \alpha ,\beta) &=\int _{0}^{1}f_{Y|p}(y|r,p)\cdot f_{p}(p|\alpha ,\beta )\mathrm {d} p \\ 
-  &=\int _{0}^{1}{\binom {y+r-1}{y}}(1-p)^{y}p^{r}\cdot {\frac {p^{\alpha -1}(1-p)^{\beta -1}}{\mathrm {B} (\alpha ,\beta )}}\mathrm {d} p \\
-  &= {\frac {\mathrm {B} (r+y,\alpha +\beta )}{\mathrm {B} (r,\alpha )}}{\frac {\Gamma (y+\beta )}{y!\;\Gamma (\beta )}}.
+  f(y \mid r, \alpha ,\beta) &=\int_{0}^{1} f_{Y \mid p}(y \mid r,p) \cdot f_{p}(p \mid \alpha ,\beta )\mathrm {d} p \\ 
+  &=\int_{0}^{1} {\binom {y+r-1}{y}} (1-p)^{y} p^{r} \cdot {\frac {p^{\alpha -1}(1-p)^{\beta -1}}{\mathrm{B} (\alpha ,\beta )}} \mathrm{d}p \\
+  &= {\frac {\mathrm{B} (r+y,\alpha +\beta )}{\mathrm{B} (r,\alpha )}}{\frac {\Gamma (y+\beta )}{y! \Gamma (\beta )}}.
   \end{aligned}$$
 
 ## Implement directly in Stan
@@ -253,7 +271,7 @@ External C++ allows writing once but automatically adapting to all data structur
 
 To fully implement a distribution in Stan, we would most like mathematically work out certain derivatives and include them too. Generally speaking, suppose we have a desire distribution $f(y)$, the pdf/pmf, cdf, ccdf of which are denoted by $f(y,\boldsymbol\theta), F(y,\boldsymbol\theta), C(y,\boldsymbol\theta)$, respectively, where $\boldsymbol\theta$ is the parameter vector. We aim to calculate the derivatives with respect to distribution parameters, after taking the logarithm:
 
-$$\nabla _{\boldsymbol {\theta}}\log f(y,\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log F(y,\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta)$$
+$$\nabla_{\boldsymbol{\theta}}\log f(y,\boldsymbol\theta), \nabla_{\boldsymbol{\theta}}\log F(y,\boldsymbol\theta), \nabla_{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta)$$
 
 where $\nabla _{\boldsymbol {\theta}}{\overset {\underset {\mathrm {def} }{}}{=}}\left[{\frac {\partial }{\partial \theta_{1}}},{\frac {\partial }{\partial \theta_{2}}},\cdots ,{\frac {\partial }{\partial \theta_{n}}}\right]^{T}={\frac {\partial }{\partial {\boldsymbol {\theta}}}}.$
 
@@ -285,13 +303,11 @@ $$\begin{aligned}
 
 Use the previous result, the partial derivatives with respect to the three parameters $r, \alpha, \beta$ are
 
-$$\begin{gather}
-\begin{align}
+$$\begin{aligned}
 \frac{\partial \log f}{\partial r} &= \psi(y+r) - \psi(y+r+\alpha+\beta) - \psi(r) + \psi(r+\alpha) \\
 \frac{\partial \log f}{\partial \alpha} &= \psi(\alpha+\beta) - \psi(y+r+\alpha+\beta) - \psi(\alpha) + \psi(r+\alpha) \\
 \frac{\partial \log f}{\partial \beta} &= \psi(\alpha+\beta) - \psi(y+r+\alpha+\beta) + \psi(y+\beta) - \psi(\beta)
-\end{align}
-\end{gather}$$
+  \end{aligned}$$
 
 ## Derivatives of logarithmic ccdf {#derivatives-of-logarithmic-ccdf .unnumbered}
 
@@ -354,19 +370,23 @@ $$\begin{aligned}
     &= \left[ _3F_2(...)^{(\{0,0,1\},\{0,0\},0)}(...) + _3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...) \right]  / _3F_2(...).
 \end{aligned}$$
 
-Similarly, the partial derivative of the $\log C(r,\alpha,\beta)$ w.r.t. $\alpha, \beta$ are $$\begin{align}
+Similarly, the partial derivative of the $\log C(r,\alpha,\beta)$ w.r.t. $\alpha, \beta$ are
+
+$$\begin{aligned}
 \frac{\partial \log C(r,\alpha,\beta)}{\partial \alpha} &= \psi(\alpha+r) - \psi(\alpha+\beta+r+y+1)  \\
 &+ \frac{\partial \log {}_3F_2(...)}{\partial \alpha} - \psi(\alpha) + \psi(\alpha+\beta) \\
 \frac{\partial \log C(r,\alpha,\beta)}{\partial \beta} &= \psi(\beta+y+1) - \psi(\alpha+\beta+r+y+1)  \\
 &+ \frac{\partial \log {}_3F_2(...)}{\partial \beta} - \psi(\beta) + \psi(\alpha+\beta), 
-\end{align}$$ where $$\begin{gather}
-\begin{align}
+  \end{aligned}$$
+
+where
+
+$$\begin{aligned}
 \frac{\partial \log {}_3F_2(...)}{\partial \alpha} 
 &=  {}_3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...)  / {}_3F_2(...) \\
 \frac{\partial \log {}_3F_2(...)}{\partial \beta}
 &= \left[ _3F_2(...)^{(\{0,0,1\},\{0,0\},0)}(...) + _3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...) \right]  / _3F_2(...)
-\end{align}
-\end{gather}$$
+  \end{aligned}$$
 
 ## Derivatives of logarithmic cdf {#derivatives-of-logarithmic-cdf .unnumbered}
 
@@ -550,11 +570,13 @@ $$\log f(y, r, \alpha ,\beta)= \left[ \frac {\mathrm {B} (r+y,\alpha +\beta )}{\
   }
 ```
 
-Compute derivative with respect to $r$, $\alpha$ and $\beta$, on the basis of needs $$\begin{aligned}
+Compute derivative with respect to $r$, $\alpha$ and $\beta$, on the basis of needs
+
+$$\begin{aligned}
 \frac{\partial \log f}{\partial r} &= \psi(y+r) - \psi(y+r+\alpha+\beta) - \psi(r) + \psi(r+\alpha) \\
 \frac{\partial \log f}{\partial \alpha} &= \psi(\alpha+\beta) - \psi(y+r+\alpha+\beta) - \psi(\alpha) + \psi(r+\alpha) \\
 \frac{\partial \log f}{\partial \beta} &= \psi(\alpha+\beta) - \psi(y+r+\alpha+\beta) + \psi(y+\beta) - \psi(\beta)
-\end{aligned}$$
+  \end{aligned}$$
 
 ``` {.c++ language="c++" style="lgeneral"}
 // compute digamma(n+r+alpha+beta)
