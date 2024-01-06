@@ -63,7 +63,7 @@ Below are the code to drive the above model from different interfaces.
 
 ## `cmdstanpy`
 
-``` {.python language="Python" style="lgeneral"}
+``` {.py language="py" style="lgeneral"}
 from cmdstanpy import CmdStanModel
 model = CmdStanModel(stan_file='bernoulli_example.stan', compile=False)
 model.compile(user_header='external.hpp')
@@ -129,25 +129,7 @@ Usually, in a project we will have many a number of model files that all depend 
 
 In `Python`
 
-``` {.py language="python" style="lgeneral"}
-import re
-def change_namespace(stan_name, user_header):
-    """Change the namespace name in the user header file.
-
-    Args:
-        stan_name (str): desired Stan file name
-        user_header (str): path to user header file
-    """
-    with open(user_header, 'r') as file:
-        content = file.read()
-    new_content = re.sub(r'^namespace \S+_model_namespace {',
-                         f'namespace {stan_name}_model_namespace {{', 
-                         content, flags=re.MULTILINE)
-    with open(user_header, 'w') as file:
-        file.write(new_content)
-```
-
-``` {.python language="py" style="lgeneral"}
+``` {.py language="py" style="lgeneral"}
 import re
 def change_namespace(stan_name, user_header):
     """Change the namespace name in the user header file.
@@ -860,29 +842,30 @@ We ran 1000 iterations on one chain, the table below shows the parameter estimat
 
 The total time of the pure Stan code with automatic differentiation is about 2 times that of the C++ code. The forward time is 37% more that that of the C++ code, which means that although the Stan code will be transpiled to C++, it is still slower than a typical C++ implementation. After using the analytic derivative, the backward pass time is reduced by 4 orders of magnitude (17000 times faster), already very close to zero. Also, the space occupation of chained automatic differentiation by pure Stan is 4-5 orders of magnitude higher than that of C++, see the Chain stacks entries. The No chain stack implemented by C++ is zero, because analytic derivatives make Stan not need to allocate additional storage space for the intermediate results of forward propagation for reverse mode automatic differentiation.
 
-  **Metric**          **C++ Model**                   **Stan Model**
-  ------------------- ------------------------------- ----------------------------------
-  *Likelihood*                                        
-  Total time (s)      62.6521                         143.977
-  Forward time (s)    62.6488                         85.9782
-  Reverse time (s)    [0.0033]{style="color: blue"}   [57.9992]{style="color: red"}
-  Chain stacks        [35042]{style="color: blue"}    [3080921832]{style="color: red"}
-  No chain stacks     0                               32796
-  Autodiff calls      35042                           32796
-  No autodiff calls   1                               1
-  *Priors*                                            
-  Total time (s)      0.0091                          0.0144
-  Forward time (s)    0.0059                          0.0101
-  Reverse time (s)    0.0031                          0.0042
-  Chain stacks        105126                          98388
-  No chain stacks     0                               0
-  Autodiff calls      35042                           32796
-  No autodiff calls   1                               1
-  *Posterior mean*                                    
-  $\hat r$            4.136                           4.070
-  $\hat \alpha$       1.725                           1.714
-  $\hat \beta$        0.568                           0.573
+| Metric | C++ Model | Stan Model |
+| ------ | --------- | ---------- |
+| **Likelihood** |  |  |
+| Total time (s) | 62.6521 | 143.977 |
+| Forward time (s) | 62.6488 | 85.9782 |
+| Reverse time (s) | `0.0033` | `57.9992` |
+| Chain stacks | `35042` | `3080921832` |
+| No chain stacks | 0 | 32796 |
+| Autodiff calls | 35042 | 32796 |
+| No autodiff calls | 1 | 1 |
+| **Priors** |  |  |
+| Total time (s) | 0.0091 | 0.0144 |
+| Forward time (s) | 0.0059 | 0.0101 |
+| Reverse time (s) | 0.0031 | 0.0042 |
+| Chain stacks | 105126 | 98388 |
+| No chain stacks | 0 | 0 |
+| Autodiff calls | 35042 | 32796 |
+| No autodiff calls | 1 | 1 |
+| **Posterior mean** |  |  |
+| $\hat r$ | 4.136 | 4.070 |
+| $\hat \alpha$ | 1.725 | 1.714 |
+| $\hat \beta$ | 0.568 | 0.573 |
 
-  : Performance analysis comparison between C++ analytic derivative implementation and Stan's built-in automatic differentiation implementation.
+
+<center>Performance analysis comparison between C++ analytic derivative implementation and Stan's built-in automatic differentiation implementation.</center>
 
 [^1]: <https://mc-stan.org/docs/cmdstan-guide/stan_csv.html>
