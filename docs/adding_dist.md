@@ -168,10 +168,16 @@ change_namespace <- function(stan_name, user_header) {
 
 # Case study: beta negative binomial distribution
 
-The beta negative binomial distribution is a generalization of negative binomial distribution. It is a compound distribution of negative binomial distribution and beta distribution. Assume $$\begin{aligned}
+The beta negative binomial distribution is a generalization of negative binomial distribution. It is a compound distribution of negative binomial distribution and beta distribution. Assume
+
+$$\begin{aligned}
   Y &\sim \text{NB}(r,p) \\
   p &\sim {\textrm {Beta}}(\alpha ,\beta ),
-  \end{aligned}$$ where we treat the probability of failure $p$ as a random variable with a beta distribution with parameters $\alpha$ and $\beta$. Then the marginal distribution of $Y$ is given by $$\begin{aligned}
+  \end{aligned}$$
+
+where we treat the probability of failure $p$ as a random variable with a beta distribution with parameters $\alpha$ and $\beta$. Then the marginal distribution of $Y$ is given by
+
+$$\begin{aligned}
   f(y|r, \alpha ,\beta) &=\int _{0}^{1}f_{Y|p}(y|r,p)\cdot f_{p}(p|\alpha ,\beta )\mathrm {d} p \\ 
   &=\int _{0}^{1}{\binom {y+r-1}{y}}(1-p)^{y}p^{r}\cdot {\frac {p^{\alpha -1}(1-p)^{\beta -1}}{\mathrm {B} (\alpha ,\beta )}}\mathrm {d} p \\
   &= {\frac {\mathrm {B} (r+y,\alpha +\beta )}{\mathrm {B} (r,\alpha )}}{\frac {\Gamma (y+\beta )}{y!\;\Gamma (\beta )}}.
@@ -245,11 +251,17 @@ External C++ allows writing once but automatically adapting to all data structur
 
 ## Calculate derivatives
 
-To fully implement a distribution in Stan, we would most like mathematically work out certain derivatives and include them too. Generally speaking, suppose we have a desire distribution $f(y)$, the pdf/pmf, cdf, ccdf of which are denoted by $f(y,\boldsymbol\theta), F(y,\boldsymbol\theta), C(y,\boldsymbol\theta)$, respectively, where $\boldsymbol\theta$ is the parameter vector. We aim to calculate the derivatives with respect to distribution parameters, after taking the logarithm: $$\nabla _{\boldsymbol {\theta}}\log f(y,\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log F(y,\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta)$$ where $\nabla _{\boldsymbol {\theta}}{\overset {\underset {\mathrm {def} }{}}{=}}\left[{\frac {\partial }{\partial \theta_{1}}},{\frac {\partial }{\partial \theta_{2}}},\cdots ,{\frac {\partial }{\partial \theta_{n}}}\right]^{T}={\frac {\partial }{\partial {\boldsymbol {\theta}}}}.$
+To fully implement a distribution in Stan, we would most like mathematically work out certain derivatives and include them too. Generally speaking, suppose we have a desire distribution $f(y)$, the pdf/pmf, cdf, ccdf of which are denoted by $f(y,\boldsymbol\theta), F(y,\boldsymbol\theta), C(y,\boldsymbol\theta)$, respectively, where $\boldsymbol\theta$ is the parameter vector. We aim to calculate the derivatives with respect to distribution parameters, after taking the logarithm:
+
+$$\nabla _{\boldsymbol {\theta}}\log f(y,\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log F(y,\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta)$$
+
+where $\nabla _{\boldsymbol {\theta}}{\overset {\underset {\mathrm {def} }{}}{=}}\left[{\frac {\partial }{\partial \theta_{1}}},{\frac {\partial }{\partial \theta_{2}}},\cdots ,{\frac {\partial }{\partial \theta_{n}}}\right]^{T}={\frac {\partial }{\partial {\boldsymbol {\theta}}}}.$
 
 Next, we take BNB distribution as an example to show the calculation process. In which case $\boldsymbol {\theta}=(r,\alpha,\beta)$.
 
-Firstly, we give the conclusions about the first derivatives of the gamma and beta functions. Let $\psi(z)$ denotes the digamma function [@olver2010nist Ch. 5], $${\frac {\mathrm {d} }{\mathrm {d} z}}\log \Gamma (z) = {\frac {\Gamma '(z)}{\Gamma (z)}} =\psi (z).$$
+Firstly, we give the conclusions about the first derivatives of the gamma and beta functions. Let $\psi(z)$ denotes the digamma function [@olver2010nist Ch. 5],
+
+$${\frac {\mathrm {d} }{\mathrm {d} z}}\log \Gamma (z) = {\frac {\Gamma '(z)}{\Gamma (z)}} =\psi (z).$$
 
 The derivative of the logarithmic beta function is
 
@@ -257,15 +269,23 @@ $$\begin{aligned}
   \frac{\partial \log B(\alpha,\beta)}{\partial \alpha} = \frac{\partial}{\partial \alpha}\left[ \log\Gamma(\alpha)+\log\Gamma(\beta)-\log\Gamma(\alpha+\beta) \right] = \psi(\alpha) - \psi(\alpha+\beta)
   \end{aligned}$$
 
-Similarly, $$\frac{\partial \log B(\alpha,\beta)}{\partial \beta} = \psi(\beta) - \psi(\alpha+\beta),$$
+Similarly,
+
+$$\frac{\partial \log B(\alpha,\beta)}{\partial \beta} = \psi(\beta) - \psi(\alpha+\beta),$$
 
 ## Derivatives of logarithmic pmf {#derivatives-of-logarithmic-pmf .unnumbered}
 
-The BNB logarithmic pmf can be expressed as combination of log gamma and log beta functions: $$\begin{aligned}
+The BNB logarithmic pmf can be expressed as combination of log gamma and log beta functions:
+
+$$\begin{aligned}
     \log f(y;r, \alpha ,\beta) &= \log\left[ \frac {B (r+y,\alpha +\beta )}{B (r,\alpha )} \frac {\Gamma (y+\beta )}{y!\;\Gamma (\beta )} \right] \\
     &= \log B (r+y,\alpha +\beta ) + \log \Gamma (y+\beta ) \\ 
     &- \log B (r,\alpha ) - \log \Gamma (\beta ) - \log y!
-\end{aligned}$$ Use the previous result, the partial derivatives with respect to the three parameters $r, \alpha, \beta$ are $$\begin{gather}
+\end{aligned}$$
+
+Use the previous result, the partial derivatives with respect to the three parameters $r, \alpha, \beta$ are
+
+$$\begin{gather}
 \begin{align}
 \frac{\partial \log f}{\partial r} &= \psi(y+r) - \psi(y+r+\alpha+\beta) - \psi(r) + \psi(r+\alpha) \\
 \frac{\partial \log f}{\partial \alpha} &= \psi(\alpha+\beta) - \psi(y+r+\alpha+\beta) - \psi(\alpha) + \psi(r+\alpha) \\
@@ -275,16 +295,24 @@ The BNB logarithmic pmf can be expressed as combination of log gamma and log bet
 
 ## Derivatives of logarithmic ccdf {#derivatives-of-logarithmic-ccdf .unnumbered}
 
-Then let's take a look at the ccdf. The ccdf for $Y\sim \text{BNB}(r,\alpha,\beta)$ is given by $$\begin{aligned}
+Then let's take a look at the ccdf. The ccdf for $Y\sim \text{BNB}(r,\alpha,\beta)$ is given by
+
+$$\begin{aligned}
 & P(Y > y) = 1 - F(r,\alpha,\beta) = C(r,\alpha,\beta) \\
 &= \frac{\Gamma (r+y +1) B(r+\alpha ,\beta +y +1) {}_3F_2(\{1,r+y +1,\beta +y +1\}; \{y +2,r+\alpha +\beta +y +1\};1)}{\Gamma (r) B(\alpha ,\beta ) \Gamma (y +2)}
-\end{aligned}$$ where $_3F_2(\{a_1,a_2,a_3\}; \{b_1,b_2\};z)$ is the generalized hypergeometric function [@olver2010nist Ch. 16] for $p=3,q=2$.
+\end{aligned}$$
+
+where $_3F_2(\{a_1,a_2,a_3\}; \{b_1,b_2\};z)$ is the generalized hypergeometric function [@olver2010nist Ch. 16] for $p=3,q=2$.
 
 It's too lengthy to explicitly express ${}_3F_2(\{1,r+y +1,\beta +y +1\}; \{y +2,r+\alpha +\beta +y +1\};1)$ everytime. In the following we use ellipsis instead of the six parameters. We denote it as $_3F_2(...)$.
 
-Remember now our task is to calculate $$\nabla _{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta) = \left( \frac{\partial \log C(\boldsymbol {\theta})}{\partial r}, \frac{\partial \log C(\boldsymbol {\theta})}{\partial \alpha}, \frac{\partial \log C(\boldsymbol {\theta})}{\partial \beta} \right)$$
+Remember now our task is to calculate
 
-Let's first take a close look at the first element in this gradient vector. After simply taking the logarithm and taking the partial derivatives, we have $$\begin{aligned}
+$$\nabla _{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta) = \left( \frac{\partial \log C(\boldsymbol {\theta})}{\partial r}, \frac{\partial \log C(\boldsymbol {\theta})}{\partial \alpha}, \frac{\partial \log C(\boldsymbol {\theta})}{\partial \beta} \right)$$
+
+Let's first take a close look at the first element in this gradient vector. After simply taking the logarithm and taking the partial derivatives, we have
+
+$$\begin{aligned}
 \frac{\partial \log C(r,\alpha,\beta)}{\partial r} &= \psi(r+y+1) + \psi(\alpha+r) - \psi(\alpha+\beta+r+y+1) - \psi(r) \\
 &+ \frac{\partial \log {}_3F_2(...)}{\partial r}.
 \end{aligned}$$
@@ -293,9 +321,15 @@ The only term in this formula that's hard to express exactly from now is the las
 
 ### Tackle derivative of $\log {}_3F_2$ {#tackle-derivative-of-log-_3f_2 .unnumbered}
 
-Although the notation may look complicated, all we need is the basic chain rule of derivation. We have $$\frac{d \log f}{dt} = \frac{df}{dt} / f$$
+Although the notation may look complicated, all we need is the basic chain rule of derivation. We have
 
-Hence $$\frac{\partial \log {}_3F_2(...)}{\partial r} =  \frac{\partial {}_3F_2(...)}{\partial r} /  {}_3F_2(...).$$ Now we are curious about $\frac{\partial {}_3F_2(...)}{\partial r}$.
+$$\frac{d \log f}{dt} = \frac{df}{dt} / f$$
+
+Hence
+
+$$\frac{\partial \log {}_3F_2(...)}{\partial r} =  \frac{\partial {}_3F_2(...)}{\partial r} /  {}_3F_2(...).$$
+
+Now we are curious about $\frac{\partial {}_3F_2(...)}{\partial r}$.
 
 Note that $r$ appears in the second and fifth position of $${}_3F_2(\{1,r+y +1,\beta +y +1\}; \{y +2,r+\alpha +\beta +y +1\};1).$$
 
@@ -303,11 +337,15 @@ Based on the derivative rules for multivariate composite functions. Given a func
 
 $$\frac{df}{dt} = \frac{\partial f}{\partial u} \frac{du}{dt} + \frac{\partial f}{\partial v} \frac{dv}{dt}.$$
 
-Therefore $$\frac{\partial {}_3F_2(...)}{\partial r} = {}_3F_2(...)^{(\{0,1,0\},\{0,0\},0)}(...) + {}_3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...),$$
+Therefore
+
+$$\frac{\partial {}_3F_2(...)}{\partial r} = {}_3F_2(...)^{(\{0,1,0\},\{0,0\},0)}(...) + {}_3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...),$$
 
 where the superscript $(\{0,0,1\},\{0,0\},0)$ denotes a specific derivative of the hypergeometric function ${}_3F_2$.
 
-Expression ${}_3F_2^{(\{0,0,1\},\{0,0\},0)}(\{a_1,a_2,a_3\},\{b_1,b_2\},z)$ indicates that we are taking the first derivative with respect to the third parameter $a_3$. The zeros means that no differentiation is to be taken with respect to the corresponding parameters, i.e., $${}_3F_2^{(\{0,0,1\},\{0,0\},0)}(\{a_1,a_2,a_3\},\{b_1,b_2\},z) = \frac{\partial \log {}_3F_2(\{a_1,a_2,a_3\},\{b_1,b_2\},z)}{\partial a_3}.$$
+Expression ${}_3F_2^{(\{0,0,1\},\{0,0\},0)}(\{a_1,a_2,a_3\},\{b_1,b_2\},z)$ indicates that we are taking the first derivative with respect to the third parameter $a_3$. The zeros means that no differentiation is to be taken with respect to the corresponding parameters, i.e.,
+
+$${}_3F_2^{(\{0,0,1\},\{0,0\},0)}(\{a_1,a_2,a_3\},\{b_1,b_2\},z) = \frac{\partial \log {}_3F_2(\{a_1,a_2,a_3\},\{b_1,b_2\},z)}{\partial a_3}.$$
 
 Finally, the partial derivative of the $\log C(r,\alpha,\beta)$ w.r.t. $r$ is
 
@@ -332,11 +370,15 @@ Similarly, the partial derivative of the $\log C(r,\alpha,\beta)$ w.r.t. $\alpha
 
 ## Derivatives of logarithmic cdf {#derivatives-of-logarithmic-cdf .unnumbered}
 
-The cdf for $Y\sim \text{BNB}(r,\alpha,\beta)$ is given by $$\begin{aligned}
+The cdf for $Y\sim \text{BNB}(r,\alpha,\beta)$ is given by
+
+$$\begin{aligned}
  P(Y\leq y) &= F(r,\alpha,\beta) = 1 - C(r,\alpha,\beta)
 \end{aligned}$$
 
-The partial derivative of the $F(r,\alpha,\beta)$ w.r.t. $r$ is $$\begin{aligned}
+The partial derivative of the $F(r,\alpha,\beta)$ w.r.t. $r$ is
+
+$$\begin{aligned}
     \frac{\partial \log F(r,\alpha,\beta)}{\partial r} &= \frac{\partial \log [1 - C(r,\alpha,\beta)]}{\partial r}\\
      &= - \frac{1}{1 - C(r,\alpha,\beta)} \frac{\partial C(r,\alpha,\beta)}{\partial r} \\
      &= - \frac{1}{1 - C(r,\alpha,\beta)} \frac{\partial \log C(r,\alpha,\beta)}{\partial r} C(r,\alpha,\beta).
@@ -346,7 +388,9 @@ This is to say, to know $\frac{\partial \log F(r,\alpha,\beta)}{\partial r}$, we
 
 # Implementation
 
-We've worked out $$\nabla _{\boldsymbol {\theta}}\log f(\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log F(\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log C(\boldsymbol\theta).$$
+We've worked out
+
+$$\nabla _{\boldsymbol {\theta}}\log f(\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log F(\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log C(\boldsymbol\theta).$$
 
 For the implementation, Stan language does not provide an interface for user-defined gradients evaluation.
 
@@ -467,7 +511,9 @@ for (size_t i = 0; i < max_size_seq_view; i++) {
   }
 ```
 
-Compute the log pmf $$\log f(y, r, \alpha ,\beta)= \left[ \frac {\mathrm {B} (r+y,\alpha +\beta )}{\mathrm {B} (r,\alpha )} \frac {\Gamma (y+\beta )}{y!\;\Gamma (\beta )} \right].$$
+Compute the log pmf
+
+$$\log f(y, r, \alpha ,\beta)= \left[ \frac {\mathrm {B} (r+y,\alpha +\beta )}{\mathrm {B} (r,\alpha )} \frac {\Gamma (y+\beta )}{y!\;\Gamma (\beta )} \right].$$
 
 ``` {.c++ language="c++" style="lgeneral"}
 // compute gamma(n+1)
@@ -700,7 +746,9 @@ Having previously checked the range of the parameters, don't forget to check the
   }
 ```
 
-Compute the log ccdf $$\begin{aligned}
+Compute the log ccdf
+
+$$\begin{aligned}
  \log P(Y > y) &= \log C(r,\alpha,\beta) \\
 &= \log\Gamma (r+y +1) + \log B(r+\alpha ,\beta +y +1) \\
 &+ {}_3F_2(\{1,r+y +1,\beta +y +1\}; \{y +2,r+\alpha +\beta +y +1\};1) \\
@@ -777,7 +825,9 @@ return ops_partials.build(P);
 
 # Performance test
 
-Then we compare the performance of precomputing gradients and using automatic differentiation on simulated datasets. We sampled $N=10000$ points form $\text{BNB}(6,2,0.5)$. The theoretical mean is $\frac{6\cdot 0.5}{2-1}=3$. The sample mean is 2.99. and the sample variance is 103.85. We run the following model with three global parameters with standard normal priors. To prevent potential identification problems, we constrain $\beta$ to be less than $r$. $$\begin{aligned}
+Then we compare the performance of precomputing gradients and using automatic differentiation on simulated datasets. We sampled $N=10000$ points form $\text{BNB}(6,2,0.5)$. The theoretical mean is $\frac{6\cdot 0.5}{2-1}=3$. The sample mean is 2.99. and the sample variance is 103.85. We run the following model with three global parameters with standard normal priors. To prevent potential identification problems, we constrain $\beta$ to be less than $r$.
+
+$$\begin{aligned}
     Y_{i} &\sim \text{BNB}(r, \alpha, \beta), i=1,...,N\\
     r &\sim \mathcal{N}(0,1) \\
     \alpha &\sim \mathcal{N}(0,1) \\ 
@@ -788,29 +838,29 @@ We ran 1000 iterations on one chain, the table below shows the parameter estimat
 
 The total time of the pure Stan code with automatic differentiation is about 2 times that of the C++ code. The forward time is 37% more that that of the C++ code, which means that although the Stan code will be transpiled to C++, it is still slower than a typical C++ implementation. After using the analytic derivative, the backward pass time is reduced by 4 orders of magnitude (17000 times faster), already very close to zero. Also, the space occupation of chained automatic differentiation by pure Stan is 4-5 orders of magnitude higher than that of C++, see the Chain stacks entries. The No chain stack implemented by C++ is zero, because analytic derivatives make Stan not need to allocate additional storage space for the intermediate results of forward propagation for reverse mode automatic differentiation.
 
-| Metric | C++ Model | Stan Model |
-| ------ | --------- | ---------- |
-| **Likelihood** |  |  |
-| Total time (s) | 62.6521 | 143.977 |
-| Forward time (s) | 62.6488 | 85.9782 |
-| Reverse time (s) | `0.0033` | `57.9992` |
-| Chain stacks | `35042` | `3080921832` |
-| No chain stacks | 0 | 32796 |
-| Autodiff calls | 35042 | 32796 |
-| No autodiff calls | 1 | 1 |
-| **Priors** |  |  |
-| Total time (s) | 0.0091 | 0.0144 |
-| Forward time (s) | 0.0059 | 0.0101 |
-| Reverse time (s) | 0.0031 | 0.0042 |
-| Chain stacks | 105126 | 98388 |
-| No chain stacks | 0 | 0 |
-| Autodiff calls | 35042 | 32796 |
-| No autodiff calls | 1 | 1 |
-| **Posterior mean** |  |  |
-| $\hat r$ | 4.136 | 4.070 |
-| $\hat \alpha$ | 1.725 | 1.714 |
-| $\hat \beta$ | 0.568 | 0.573 |
+  **Metric**          **C++ Model**                   **Stan Model**
+  ------------------- ------------------------------- ----------------------------------
+  *Likelihood*                                        
+  Total time (s)      62.6521                         143.977
+  Forward time (s)    62.6488                         85.9782
+  Reverse time (s)    [0.0033]{style="color: blue"}   [57.9992]{style="color: red"}
+  Chain stacks        [35042]{style="color: blue"}    [3080921832]{style="color: red"}
+  No chain stacks     0                               32796
+  Autodiff calls      35042                           32796
+  No autodiff calls   1                               1
+  *Priors*                                            
+  Total time (s)      0.0091                          0.0144
+  Forward time (s)    0.0059                          0.0101
+  Reverse time (s)    0.0031                          0.0042
+  Chain stacks        105126                          98388
+  No chain stacks     0                               0
+  Autodiff calls      35042                           32796
+  No autodiff calls   1                               1
+  *Posterior mean*                                    
+  $\hat r$            4.136                           4.070
+  $\hat \alpha$       1.725                           1.714
+  $\hat \beta$        0.568                           0.573
 
-<center>Performance analysis comparison between C++ analytic derivative implementation and Stan's built-in automatic differentiation implementation.</center>
+  : Performance analysis comparison between C++ analytic derivative implementation and Stan's built-in automatic differentiation implementation.
 
 [^1]: <https://mc-stan.org/docs/cmdstan-guide/stan_csv.html>
