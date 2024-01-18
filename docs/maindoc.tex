@@ -2,7 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[margin=1in]{geometry}
 \geometry{a4paper}
-\linespread{1} %全局行距
+\linespread{1} 
 
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -17,7 +17,7 @@
 \usepackage{multirow}
 \usepackage{rotating}
 \usepackage{fancyhdr}
-\pagestyle{fancy} %全文使用的pagestyle
+\pagestyle{fancy} 
 \renewcommand{\headrulewidth}{0pt}
 \lhead{}\chead{}\rhead{}
 \lfoot{}\cfoot{\thepage}\rfoot{}
@@ -25,26 +25,26 @@
 \allsectionsfont{\sffamily\mdseries\upshape}
 
 \usepackage[ruled,linesnumbered]{algorithm2e}
-\usepackage{mathtools} % 左下标\prescript{}{3}{F_2}
+\usepackage{mathtools} 
 
 \usepackage{natbib}
 \bibliographystyle{abbrvnat}
-\usepackage{filecontents} %允许把bib写在tex里
+\usepackage{filecontents} 
 
 \usepackage{CJKutf8}
 \usepackage{cprotect}
 \usepackage{booktabs}
-\usepackage[dvipsnames]{xcolor} %代码高亮+ref额外颜色
-\usepackage[toc,title,titletoc]{appendix} %附录
+\usepackage[dvipsnames]{xcolor} 
+\usepackage[toc,title,titletoc]{appendix} 
 
 \usepackage{graphicx}
-\usepackage{float}%设置图片浮动位置
-\usepackage[labelformat=simple]{subcaption} %更先进的子图包
+\usepackage{float}
+\usepackage[labelformat=simple]{subcaption} 
 \renewcommand\thesubfigure{(\alph{subfigure})}
 
 \usepackage{hyperref}
 \hypersetup{
-	colorlinks=true,%会取消边框
+	colorlinks=true,
 	linkcolor=blue,
 	filecolor=cyan,
 	urlcolor=magenta,
@@ -52,28 +52,28 @@
 	citecolor= Green
 }
 
-\setlength{\parindent}{0em} %段首不缩进
-\setlength{\parskip}{1ex} %段间空一行
+\setlength{\parindent}{0em} 
+\setlength{\parskip}{1ex} 
 
 \definecolor{codegrey}{HTML}{F8F8F8}
-\usepackage{listings} %插入代码
-\usepackage{textcomp} %引号变直
+\usepackage{listings} 
+\usepackage{textcomp} 
 \lstset{
-	upquote=true, %引号变直
-    numbers=none, %设置行号位置
-    rulesepcolor= \color{gray}, % 代码块边框颜色
-    backgroundcolor = \color{codegrey},    % 背景色
-    basicstyle=\ttfamily,       % the size of the fonts that are used for the code
-    numberstyle=\tiny, %设置行号大小
-    keywordstyle=\color{blue}, %设置关键字颜色
-    commentstyle=\color[cmyk]{1,0,1,0}, %设置注释颜色
-    frame=single, %设置边框格式
-    escapeinside=``, %逃逸字符(1左面的键)，用于显示中文
-    breaklines=true, %自动折行
-    extendedchars=false, %解决代码跨页时，章节标题，页眉等汉字不显示的问题
-    tabsize=4, %设置tab空格数
-    columns=fullflexible, %紧凑间隔
-    showspaces=false, %不显示空格
+	upquote=true, 
+    numbers=none, 
+    rulesepcolor= \color{gray}, 
+    backgroundcolor = \color{codegrey},    
+    basicstyle=\ttfamily,       
+    numberstyle=\tiny, 
+    keywordstyle=\color{blue}, 
+    commentstyle=\color[cmyk]{1,0,1,0}, 
+    frame=single, 
+    escapeinside=``, 
+    breaklines=true, 
+    extendedchars=false, 
+    tabsize=4, 
+    columns=fullflexible, 
+    showspaces=false, 
     linewidth=\linewidth,
 }
 
@@ -112,7 +112,7 @@
   style = lothers,
 }
 \lstdefinelanguage{py}{language=python}
-%https://github.com/jrnold/lstbayes
+
 \usepackage{lstbayes}
 \usepackage{longtable}
 
@@ -125,41 +125,12 @@
 
 
 \begin{document}
-%\begin{CJK}{UTF8}{gbsn}
+
 \maketitle
 
 
 \section{Introduction}
-\begin{comment}
-stan 的反向自动微分完全消除了导数的实现负担，但同时也成为了stan程序典型的性能瓶颈。为了直观地感受这种差异，以下是一个可运行的例子。
 
-For example, one may typically have the code for negative binomial distribution
-
-\begin{lstlisting}[language=Stan, style=lgeneral]
-target += neg_binomial_2_lpmf(y | alpha, beta);
-\end{lstlisting}
-
-However, when the negative binomial distribution needs to be truncated, we may have
-\begin{lstlisting}[language=Stan, style=lgeneral]
-target += neg_binomial_2_lpmf(y | alpha, beta) T[0,k];
-// or
-target += neg_binomial_2_lpmf(y | alpha, beta) - neg_binomial_2_lcdf(k | alpha, beta);
-// or in anywhere of the model you linked target and neg_binomial_2_lcdf/lccdf.
-\end{lstlisting}
-
-Therefore, it would be beneficial to promote statisticians and developers to work together to improve the Stan math library. The following facts were pointed out by \href{https://github.com/stan-dev/stan/wiki/Contributing-to-Stan-Without-C-Plus-Plus--Experience}{Stan's developer wiki}: the development of the Stan language is hindered not only by technical challenges but also by mathematical complexities, especially when adding new probability density functions. Ideally, each density function in Stan should have analytical specifications of its density, gradient, cumulative distribution function, and random number generation. This necessitates extensive research before coding. 
-
-
-This has many benefits: 
-\begin{enumerate}
-	\item Significantly reduces reverse automatic differentiation (AD) overhead. Since Stan spends most of its time calculating the gradient of the log probability function\footnote{\href{https://mc-stan.org/docs/stan-users-guide/vectorization.html}{Stan user's guide}}, this therefore greatly reduces the runtime and memory overhead of Stan programs.
-	\item C++ template metaprogramming feature avoids manually and repeatedly writing function overloads, achieving automatic input adaptation and vectorization.
-	\item One can submit the newly written distribution to \href{https://mc-stan.org/users/interfaces/math}{Stan Math Library}, contributing to the open source community. So that everyone can benefit from it.
-\end{enumerate}
-
-
-For example, Stan haven't implement the derivatives of \href{https://github.com/stan-dev/math/blob/develop/stan/math/prim/prob/neg_binomial_2_lcdf.hpp}{lcdf} and \href{https://github.com/stan-dev/math/blob/develop/stan/math/prim/prob/neg_binomial_2_lccdf.hpp}{lccdf} of the negative binomial distribution (alternative parameterization).
-\end{comment}
 This case study aims to provide a mature example of implementing analytic derivatives using Stan's external C++ interface. This avoids automatic differentiation to significantly speed up computation. And with the help of template functions, a level of abstraction not provided in Stan is achieved. We will foused on give the process of implementing a  probability distribution in Stan, from mathematical details to technical details. This article is generally suitable for statisticians with some C++ experience. Developers familiar with the structure of the Stan Math Library have already done a lot of work in this regard (hats off to the Stan development team), but these efforts are less documented.
 
 
@@ -342,14 +313,7 @@ Now that we know how to call external C++ code from Stan. However, if we simply 
 
 Let's start with an example to see, specifically, how the above three issues arise, are analyzed, and then resolved.
 
-\begin{comment}
-通常情况下，在项目中我们会有很多不同的模型文件共同依赖同一个（或一些）C++头文件。为了应对第一点，在每次编译时，都需要手动更改C++代码的命名空间，这是繁琐且容易出错的。如下代码可以帮助解决这一问题。
 
-现在我们知道了如何从stan中调用外部c++代码了，请编译运行试试吧。然而，如果只是单纯地将stan代码转换为C++，在编译器转译后两者几乎是没有区别的。我们使用c++的目的是为了达成那些stan中还未提供的功能、海量的第三方库和新的语言特性。例如，由于c++生态较为完善，一些比较偏门数学的函数在c++中有较强的可用性，而stan还没有成熟的接口。要求这些函数全部暴露在stan中是不现实的，也会给开发者造成负担。又比如，C++提供非常高级的抽象，而stan在语言方面还比较受限。模版函数能够把用同一个算法去适用于不同类型数据，从而大大减少开发时间。最后，stan中还不提供梯度接口，如果有梯度的解析式，想避免自动微分的开销的话，只能寻求外部c++。
-
-让我们从一个例子出发来看看，具体地来说，上面的3点问题是如何产生，分析，并得到解决的。
-
-\end{comment}
 
 
 
@@ -635,10 +599,7 @@ It is difficult to implement these functions directly in Stan. First, the ${}_3F
 
 
 \section{Implementation}
-\begin{comment}
-Here are all source code 
-https://github.com/stan-dev/math/tree/develop/stan/math/prim/prob
-\end{comment}
+
 
 We've worked out
 
@@ -721,9 +682,7 @@ stan::return_type_t< ... > {distribution}_lpmf( {function parameters} ) {
 \cprotect\subsection{\verb|beta_neg_binomial_lpmf|}
 Let's start with \verb|beta_neg_binomial_lpmf|. We only need to write one function instead of writing it for each input type permutation.
 
-\begin{comment}
-We'll look at how to use template function in combination with the gradient interface. Thanks to the powerful generic mechanism of C++, we only need to write one function instead of writing it for each input type permutation.
-\end{comment}
+
 
 Identity namespace and write code within it.
 \begin{lstlisting}[language=c++, style=lgeneral]
@@ -1016,10 +975,7 @@ Let’s explain the structure of \verb|beta_neg_binomial_lccdf| in detail.
 
 Looking further at the specific expressions, we found that there are two difficulties in the implementation of lccdf, namely ${}_3F_2$ and its derivatives $\frac{\partial {}_3F_2(...)}{\partial \boldsymbol{\theta}}$. Luckily, we have \verb|hypergeometric_3F2| and \verb|grad_F32| in Stan Math Library. See docs in \cprotect{\href{https://mc-stan.org/math/hypergeometric__3_f2_8hpp.html}}{\verb|hypergeometric_3F2.hpp|} and \cprotect{\href{https://mc-stan.org/math/grad___f32_8hpp.html}}{\verb|grad_F32.hpp|}.
 
-\begin{comment}
 
-
-\end{comment}
 
 
 
@@ -1287,35 +1243,7 @@ Use \verb|neg_binomial_rng| to sample $y$.
 
 
 
-\begin{comment}
-\section{Return check}
-We implement these functions in python, and then check whether the running results in Stan meet our expectations.
 
-
-
-\begin{lstlisting}[language=python, style=lgeneral]
-import numpy as np
-import scipy.stats as stats
-from scipy.special import betaln, gammaln, zeta
-
-def beta_neg_binomial_pmf(y, r, a, b):
-    lprobs = betaln(r+y,a+b) - betaln(r,a) + gammaln(y+b) - gammaln(y+1) - gammaln(b)
-    return np.exp(lprobs)
-
-def beta_neg_binomial_cdf(y, r, a, b):
-    cdfs = np.zeros(len(y))
-    for i, yi in enumerate(y):
-        cdfs[i] = np.sum(beta_neg_binomial_pmf(np.arange(yi+1), r, a, b))
-    return cdfs
-
-def beta_neg_binomial_rng(r, alpha, beta, size=1, seed=None):
-    if seed is not None:
-        np.random.seed(seed)
-    p = stats.beta.rvs(alpha, beta, size=size)
-    # N Number of successes, p probability of success
-    return stats.nbinom.rvs(n=r, p=p)
-\end{lstlisting}
-\end{comment}
 
 
 
@@ -1379,57 +1307,7 @@ The total time of the pure Stan code with automatic differentiation is about 2 t
 \end{table}
 
 
-\begin{comment}
 
-
-\section{Optimize speed and numerical accuracy}
-Before formally submitting to the stan math library, it is necessary to check potential performance bottlenecks and numerical accuracy issues.
-
-From \href{https://functions.wolfram.com/HypergeometricFunctions/Hypergeometric3F2/03/02/01/}{functions.wolfram.com}, we find that for Hypergeometric function ${}_3F_2(a,b,c;d,e;z)$, when $d+e-a-b-c>0$ and $z=1$, it becomes to
-
-$$_3F_2(a,b,c;d,e;1)=\frac{\sqrt{\Gamma(1-a)}  \sqrt{\Gamma(1-b)} \sqrt{\Gamma(1-c)} \Gamma(d)\Gamma(e)\sqrt{\Gamma(d+e-a-b-c)} <...>}{\sqrt{d+e-b-c-1} \sqrt{\Gamma(d-a)}\sqrt{\Gamma(d-b)}\sqrt{\Gamma(d-c)} \sqrt{\Gamma(e-a)}\sqrt{\Gamma(e-b)} \sqrt{\Gamma(e-c)}  }$$
-
-where 
-
-\begin{equation}
-\begin{aligned}
-<...>&=\left< \frac{d-a-b-1}{2}\frac{e-a-c-1}{2}\frac{b+d-a-1}{2}\frac{a-c-e+1}{2} \bigg| \right. \\
-&\left. \frac{d-a-b-1}{2}\frac{e-a-c-1}{2}\frac{d+e-b-c}{2}-1\frac{b+d-c-e}{2} \right>
-&
-\end{aligned}
-\end{equation}
-
-is the Clebsch-Gordan coefficient in Wolfram representation.
-
-From \href{https://reference.wolfram.com/language/ref/ThreeJSymbol.html}{reference.wolfram.com}, it has the following relationship with the Wigner 3‐j symbol
-
-\begin{equation}
-	\left(\begin{array}{l l l}{{j_{1}}}&{{j_{2}}}&{{j_{3}}}\\ {{m_{1}}}&{{m_{2}}}&{{-m_{3}}}\end{array}\right)=\frac{(-1)^{-j_1+j_2-m_3}}{\sqrt{2 j_{3}+1}} < j_{1}j_{2}m_{1}m_{2}| j_{1}j_{2}j_{3}m_{3}>
-\end{equation}
-
-So that
-
-\begin{equation}
-  \begin{aligned}
-  j_1 &= \frac{d-a-b-1}{2} \\
-  j_2 &= \frac{e-a-c-1}{2} \\
-  j_3 &= \frac{d+e-b-c}{2}-1 \\
-  m_1 &= \frac{b+d-a-1}{2} \\
-  m_2 &= \frac{a-c-e+1}{2} \\
-  m_3 &= \frac{b+d-c-e}{2} \\
-  \end{aligned}
-\end{equation}
-
-
-The Wigner 3‐j symbol has 
-
-
-
-Our aim is to compute
-$${}_3F_2(\{1,r+y +1,\beta +y +1\}; \{y +2,r+\alpha +\beta +y +1\};1),$$
-where $(y +2 + r+\alpha +\beta +y +1)-(1+r+y +1+\beta +y +1)=\alpha>0$ and $z=1$. Meet the conditions.
-
-\end{comment}
 
 \section{Unit test}
 To do.
@@ -1449,7 +1327,7 @@ To do.
 
 
 
-%\end{CJK}
+
 \end{document}
 
 
