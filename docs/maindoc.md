@@ -1,12 +1,12 @@
 # Introduction
 
-This case study aims to provide a mature example of implementing analytic derivatives using Stan's external C++ interface. This avoids automatic differentiation to significantly speed up operations. And with the help of template functions, a level of abstraction not provided in Stan is achieved. We will foused on give the process of adding a complete distribution in Stan, from mathematical details to technical details. This post typically for statisticians with some C++ experience. Developers familiar with the structure of the Stan Math Library have already done a lot of work in this regard (hats off to the Stan development team), but these efforts are less documented.
+This case study aims to provide a mature example of implementing analytic derivatives using Stan's external C++ interface. This avoids automatic differentiation to significantly speed up computation. And with the help of template functions, a level of abstraction not provided in Stan is achieved. We will foused on give the process of implementing a probability distribution in Stan, from mathematical details to technical details. This article is generally suitable for statisticians with some C++ experience. Developers familiar with the structure of the Stan Math Library have already done a lot of work in this regard (hats off to the Stan development team), but these efforts are less documented.
 
-We will also focus on Stan's gradient interface. Stan's reverse automatic differentiation completely eliminates the implementation burden of derivatives. However, as noted in the [Stan's developer wiki](https://github.com/stan-dev/stan/wiki/Contributing-to-Stan-Without-C-Plus-Plus--Experience), Stan has a number of probability functions that have not implement derivatives. These places can also become performance bottlenecks for potential programs. For example, Stan haven't implement the derivatives of [lcdf](https://github.com/stan-dev/math/blob/develop/stan/math/prim/prob/neg_binomial_2_lcdf.hpp) and [lccdf](https://github.com/stan-dev/math/blob/develop/stan/math/prim/prob/neg_binomial_2_lccdf.hpp) of the negative binomial distribution (alternative parameterization). As long as people with strong mathematical background actively join the development of Stan, the Stan Math Library can make a lot of improvements in this regard.
+During this process, we will intersperse explanations about Stan's gradient interface. The everse automatic differentiation in Stan completely eliminates the implementation burden of derivatives. However, as noted in the [Stan's developer wiki](https://github.com/stan-dev/stan/wiki/Contributing-to-Stan-Without-C-Plus-Plus--Experience), Stan has a number of probability functions that have not implement derivatives. These places can also become performance bottlenecks for potential programs. As long as people with strong mathematical background actively join the development of Stan, the Stan Math Library can make a lot of improvements in this regard.
 
 # Interacting with external C++
 
-External C++ functions are currently the only way to encode a function with a known analytic gradient outside the Stan Math Library. So let's first introduce how to interact with external c++ code.
+External C++ functions are currently the only way to encode a function with a known analytic gradient outside the Stan Math Library. So let's first introduce how to interact with external C++ code.
 
 Examples of how to use basic external C++ code in Stan can be found in many places. Some official documentation are as follows:
 
@@ -15,9 +15,9 @@ Examples of how to use basic external C++ code in Stan can be found in many plac
 [External C++ (experimental)](https://pystan2.readthedocs.io/en/latest/external_cpp.html)\
 [Using the Stan Math C++ Library](https://cran.r-project.org/web/packages/StanHeaders/vignettes/stanmath.html)
 
-The existing materials exist in scattered documents. Here we provide working examples for stan's main interfaces and point out some noteworthy aspects in practice.
+The existing materials exist in scattered documents. Here we provide working examples and point out some noteworthy aspects in practice.
 
-Consider the following Stan model, based on the bernoulli [example](https://mc-stan.org/docs/cmdstan-guide/using-external-cpp-code.html) in the CmdStan documentation. Assume that there are the following Stan code and c++ header files in the same directory.
+Consider the following Stan model, based on the [bernoulli example](https://mc-stan.org/docs/cmdstan-guide/using-external-cpp-code.html) in the CmdStan documentation. Assume that there are the following Stan code and C++ header files in the same directory.
 
 `bernoulli_example.stan`
 
@@ -55,9 +55,9 @@ namespace bernoulli_example_model_namespace {
 
 To use `external.hpp` in Stan, basically we need to achieve the followings:
 
-1.  In the Stan model, expose function signature in the `functions` block.
+1.  In the Stan model, expose function declarations in the `functions` block.
 
-2.  When compile, add `--allow-undefined` to `STANCFLAGS` and specify where the header file is through the `user_header` option.
+2.  When compile, add `--allow-undefined` to `STANCFLAGS` and specify where the header files are through the `user_header` option.
 
 Below are the code to drive the above model from different interfaces.
 
@@ -123,7 +123,7 @@ If there are errors during compilation or running, try troubleshooting the follo
 
 2.  If the function prints something to the screen, we must add the additional argument `std::ostream *pstream__` to the function declaration.
 
-3.  All function signature in Stan `functions` block must match the function definitions in the header files.
+3.  All function signature in Stan `functions` block must match the function declarations in the header files.
 
 Usually, in a project we will have many a number of model files that all depend on the same (or some) C++ header files. To deal with the first point, one need to manually change the namespace of the C++ code every time compile each of the model, which is tedious and error-prone. The following code can help solve this problem.
 
@@ -166,7 +166,17 @@ change_namespace <- function(stan_name, user_header) {
     
 ```
 
-# Case study: beta negative binomial distribution
+Now that we know how to call external C++ code from Stan. However, if we simply \"translate\" what is possible in Stan to C++, there will be almost no difference between them when the compiler translates it. The purpose of using C++ is to achieve functionalities not yet available in Stan, to utilize its vast third-party libraries, and to exploit new language features. Here are some common feature requests
+
+1.  C++ has a more mature ecosystem, providing stronger availability for some niche mathematical functions not yet well-supported in Stan. It's unrealistic to expect these functions to be fully integrated into Stan, as it would burden developers.
+
+2.  C++ offers advanced abstractions, whereas Stan is more limited linguistically. For example, template function enables the use of the same algorithm on different data types, significantly reducing development time, especially in a production environment.
+
+3.  Stan doesn't offer gradient interfaces yet. If one has an analytical gradient and wishes to avoid the overhead of automatic differentiation, external C++ is the only option.
+
+Let's start with an example to see, specifically, how the above three issues arise, are analyzed, and then resolved.
+
+# Case study
 
 The beta negative binomial distribution is a generalization of negative binomial distribution. It is a compound distribution of negative binomial distribution and beta distribution. Assume
 
@@ -229,7 +239,7 @@ real beta_neg_binomial_lpmf(array[] int y, real r, real a, real b) {
 target += beta_neg_binomial_lpmf(y, r, a, b);
 ```
 
-If any one of the parameters `r, a,` and `b` can be a vector, we need to overload the function `beta_neg_binomial_lpmf` so that it has the following signatures
+If any one of the parameters `r, a,` and `b` can be a vector, we need to repeatedly implement the function so that it has the following signatures
 
 ``` {.Stan language="Stan" style="lgeneral"}
 real beta_neg_binomial_lpmf(array[] int y, real r, real a, real b)
@@ -241,21 +251,17 @@ real beta_neg_binomial_lpmf(array[] int y, real r, vector a, vector b)
 real beta_neg_binomial_lpmf(array[] int y, vector r, vector a, vector b)
 ```
 
-But this does not cover all situations. For example, if the following data types are passed in without knowing it, stan will report an error.
+However, this does not cover all cases and errors are likely to occur during the coding process. This is the second issue raised at the end of the previous section.
 
-``` {.Stan language="Stan" style="lgeneral"}
-real beta_neg_binomial_lpmf(int y, vector r, real a, real b)
-```
-
-External C++ allows writing once but automatically adapting to all data structures when faced with a new distribution. Let's see how it works.
+External C++ allows writing once but automatically adapting to all data structures when faced with a new distribution. We'll see how it works.
 
 ## Calculate derivatives
 
 To fully implement a distribution in Stan, we would most like mathematically work out certain derivatives and include them too. Generally speaking, suppose we have a desire distribution $f(y)$, the pdf/pmf, cdf, ccdf of which are denoted by $f(y,\boldsymbol\theta), F(y,\boldsymbol\theta), C(y,\boldsymbol\theta)$, respectively, where $\boldsymbol\theta$ is the parameter vector. We aim to calculate the derivatives with respect to distribution parameters, after taking the logarithm:
 
-$$\nabla_{\boldsymbol{\theta}}\log f(y,\boldsymbol\theta), \nabla_{\boldsymbol{\theta}}\log F(y,\boldsymbol\theta), \nabla_{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta)$$
+$$\nabla_{\boldsymbol{\theta}} \log f(y,\boldsymbol\theta), \nabla_{\boldsymbol{\theta}}\log F(y,\boldsymbol\theta), \nabla_{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta)$$
 
-where $\nabla _{\boldsymbol {\theta}}{\overset {\underset {\mathrm {def} }{}}{=}}\left[{\frac {\partial }{\partial \theta_{1}}},{\frac {\partial }{\partial \theta_{2}}},\cdots ,{\frac {\partial }{\partial \theta_{n}}}\right]^{T}={\frac {\partial }{\partial {\boldsymbol {\theta}}}}.$
+where $\nabla_{\boldsymbol{\theta}}{\overset{\underset {\mathrm{def} }{}}{=}}\left[{\frac{\partial }{\partial \theta_{1}}},{\frac{\partial }{\partial \theta_{2}}},\cdots ,{\frac{\partial }{\partial \theta_{n}}}\right]={\frac{\partial }{\partial {\boldsymbol{\theta}}}}.$
 
 Next, we take BNB distribution as an example to show the calculation process. In which case $\boldsymbol {\theta}=(r,\alpha,\beta)$.
 
@@ -293,7 +299,7 @@ $$\begin{aligned}
 
 ## Derivatives of logarithmic ccdf {#derivatives-of-logarithmic-ccdf .unnumbered}
 
-Then let's take a look at the ccdf. The ccdf for $Y\sim \text{BNB}(r,\alpha,\beta)$ is given by
+Then let's take a look at the ccdf. From [Wolfrom](https://reference.wolfram.com/language/ref/BetaNegativeBinomialDistribution.html), the ccdf for $Y\sim \text{BNB}(r,\alpha,\beta)$ is given by
 
 $$\begin{aligned}
 & P(Y > y) = 1 - F(r,\alpha,\beta) = C(r,\alpha,\beta) \\
@@ -302,13 +308,13 @@ $$\begin{aligned}
 
 where $_3F_2(\{a_1,a_2,a_3\}; \{b_1,b_2\};z)$ is the generalized hypergeometric function [@olver2010nist Ch. 16] for $p=3,q=2$.
 
-It's too lengthy to explicitly express ${}_3F_2(\{1,r+y +1,\beta +y +1\}; \{y +2,r+\alpha +\beta +y +1\};1)$ everytime. In the following we use ellipsis instead of the six parameters. We denote it as $_3F_2(...)$.
+It's too lengthy to explicitly express ${}_3F_2(\{1,r+y +1,\beta +y +1\}; \{y +2,r+\alpha +\beta +y +1\};1)$ everytime. In the following we use ellipsis instead of the six parameters. We will denote it as $_3F_2(...)$.
 
 Remember now our task is to calculate
 
-$$\nabla _{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta) = \left( \frac{\partial \log C(\boldsymbol {\theta})}{\partial r}, \frac{\partial \log C(\boldsymbol {\theta})}{\partial \alpha}, \frac{\partial \log C(\boldsymbol {\theta})}{\partial \beta} \right)$$
+$$\nabla _{\boldsymbol {\theta}}\log C(y,\boldsymbol\theta) = \left[ \frac{\partial \log C(\boldsymbol {\theta})}{\partial r}, \frac{\partial \log C(\boldsymbol {\theta})}{\partial \alpha}, \frac{\partial \log C(\boldsymbol {\theta})}{\partial \beta} \right]$$
 
-Let's first take a close look at the first element in this gradient vector. After simply taking the logarithm and taking the partial derivatives, we have
+Let's first take a close look at the first element in this vector. After simply taking the logarithm and taking the partial derivatives, we have
 
 $$\begin{aligned}
 \frac{\partial \log C(r,\alpha,\beta)}{\partial r} &= \psi(r+y+1) + \psi(\alpha+r) - \psi(\alpha+\beta+r+y+1) - \psi(r) \\
@@ -319,7 +325,7 @@ The only term in this formula that's hard to express exactly from now is the las
 
 ### Tackle derivative of $\log {}_3F_2$ {#tackle-derivative-of-log-_3f_2 .unnumbered}
 
-Although the notation may look complicated, all we need is the basic chain rule of derivation. We have
+Although the notation may look complicated, all we need is the basic chain rule. We have
 
 $$\frac{d \log f}{dt} = \frac{df}{dt} / f$$
 
@@ -349,7 +355,7 @@ Finally, the partial derivative of the $\log C(r,\alpha,\beta)$ w.r.t. $r$ is
 
 $$\begin{aligned}
     \frac{\partial \log {}_3F_2(...)}{\partial r} &=  \frac{\partial {}_3F_2(...)}{\partial r} /  {}_3F_2(...) \\
-    &= \left[ _3F_2(...)^{(\{0,0,1\},\{0,0\},0)}(...) + _3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...) \right]  / _3F_2(...).
+    &= \left[ _3F_2(...)^{(\{0,1,0\},\{0,0\},0)}(...) + _3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...) \right]  / _3F_2(...).
 \end{aligned}$$
 
 Similarly, the partial derivative of the $\log C(r,\alpha,\beta)$ w.r.t. $\alpha, \beta$ are
@@ -388,21 +394,83 @@ $$\begin{aligned}
 
 This is to say, to know $\frac{\partial \log F(r,\alpha,\beta)}{\partial r}$, we only need to know $\frac{\partial \log C(r,\alpha,\beta)}{\partial r}$, which we've already give the the previous subsection. The same for $\alpha$ and $\beta$.
 
+It is difficult to implement these functions directly in Stan. First, the ${}_3F_2$ function and its derivatives are not provided in Stan. Second, Stan cannot use user-defined gradients. These are the first and third issues raised at the end of the previous section.
+
 # Implementation
 
 We've worked out
 
 $$\nabla _{\boldsymbol {\theta}}\log f(\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log F(\boldsymbol\theta), \nabla _{\boldsymbol {\theta}}\log C(\boldsymbol\theta).$$
 
-For the implementation, Stan language does not provide an interface for user-defined gradients evaluation.
+For the implementation, our aim is to compelete four functions: `beta_neg_binomial_lpmf`, `beta_neg_binomial_lcdf`, `beta_neg_binomial_lccdf` and `beta_neg_binomial_rng`. The existing probability functions in the Stan Math Library provide very high-quality examples, which can be found [here](https://github.com/stan-dev/math/tree/develop/stan/math/prim/prob).
 
-so we have to implement it from Stan's lower-level C++ interface. In this section we will investigate the specifications of Stan's C++ interface. Our aim is to compelete four functions: `beta_neg_binomial_lpmf`, `beta_neg_binomial_lcdf`, `beta_neg_binomial_lccdf` and `beta_neg_binomial_rng`.
+The skeleton of each function is basically as follows.
+
+``` {.c++ language="c++" style="lgeneral"}
+template < {template parameters} > 
+stan::return_type_t< ... > {distribution}_lpmf( {function parameters} ) { 
+    
+    // Type Aliases
+    using stan::partials_return_t;
+    using T_partials_return = partials_return_t< ... >;
+    ...
+    
+    // Error Handling
+
+    // Check sizes of input parameters
+    check_consistent_sizes()
+    if (size_zero( {any} )) {
+      return 0.0;
+    }
+    ...
+    
+    // Check domain of input parameters
+    check_positive_finite()
+    ...
+    // Add other domain checks as needed
+
+    // Other potential error checks
+
+    // Initialization
+    T_partials_return logp = 0.0; // Initialize log probability
+    operands_and_partials< {operand types} > ops_partials( {operands} ); // Initialize partial derivatives
+    
+    // Convert inputs to vector views to handle both scalars and vectors
+    scalar_seq_view< {input types} > {input names}({input variables});
+    ...
+
+    // Determine sizes of input data
+    size_t size_{input1} = stan::math::size({input1});
+    size_t size_{input2} = stan::math::size({input2});
+    ...
+
+    // Implementation Details
+    for (size_t i = 0; i < max_size( {inputs} ); ++i) {
+        // Core logic for calculating the beta-negative binomial log probability
+        // This typically involves calls to functions in stan::math, etc.
+        // Example:
+        // logp += lgamma({args}) - lgamma({args});
+        
+        // Gradient calculations for automatic differentiation
+        if (!is_constant_all< {input types} >::value) {
+            // Compute partial derivatives
+            // Example:
+            // ops_partials.edge1_.partials_[i] += ...
+            // ops_partials.edge2_.partials_[i] += ...
+        }
+    }
+
+    // Collect results and return
+    return ops_partials.build(logp);
+}
+    
+```
 
 ## `beta_neg_binomial_lpmf`
 
-Let's start with `beta_neg_binomial_lpmf`. Thanks to the powerful generic mechanism of C++ (possibly the most powerful on Earth), we only need to write one function instead of writing it for each input type permutation.
+Let's start with `beta_neg_binomial_lpmf`. We only need to write one function instead of writing it for each input type permutation.
 
-Identity namespace and write code within it
+Identity namespace and write code within it.
 
 ``` {.c++ language="c++" style="lgeneral"}
 namespace <THE_NAME_OF_STAN_MODEL>_model_namespace {
@@ -410,7 +478,7 @@ namespace <THE_NAME_OF_STAN_MODEL>_model_namespace {
 }
 ```
 
-Start of the function
+Declaration of the function.
 
 ``` {.c++ language="c++" style="lgeneral"}
 template <bool propto, typename T_n, typename T_r, typename T_size1,
@@ -426,7 +494,7 @@ stan::return_type_t<T_r, T_size1, T_size2> beta_neg_binomial_lpmf(const T_n& n,
 }
 ```
 
-Import some members into the current scope
+Specify aliases.
 
 ``` {.c++ language="c++" style="lgeneral"}
 using stan::partials_return_t;
@@ -439,18 +507,13 @@ using stan::partials_return_t;
   using stan::math::lgamma;
   using stan::math::size;
   using stan::math::max_size;   
-```
-
-Specify aliases
-
-``` {.c++ language="c++" style="lgeneral"}
-using T_partials_return = partials_return_t<T_r, T_size1, T_size2>;
+  using T_partials_return = partials_return_t<T_r, T_size1, T_size2>;
   using T_r_ref = ref_type_t<T_r>;
   using T_alpha_ref = ref_type_t<T_size1>;
   using T_beta_ref = ref_type_t<T_size2>;
 ```
 
-Check whether the shape of the incoming data conforms to the specification
+Check whether the shape of the incoming data conforms to the specification. It throws a `std::invalid_argument` if the sizes of the input containers don't match.
 
 ``` {.c++ language="c++" style="lgeneral"}
 static const char* function = "beta_neg_binomial_lpmf";
@@ -463,7 +526,7 @@ static const char* function = "beta_neg_binomial_lpmf";
   }
 ```
 
-Check whether the value of the incoming parameter vector is within the parameter space
+Check whether the value of the incoming parameter vectors are within the parameter spaces. throws a `std::domain_error` if any of the parameters are not positive and finite.
 
 ``` {.c++ language="c++" style="lgeneral"}
 T_r_ref r_ref = r;
@@ -482,7 +545,7 @@ if (!include_summand<propto, T_r, T_size1, T_size2>::value) {
   }
 ```
 
-Initialization return value, as well as some quantities that will be reused in subsequent calculations
+Initialization return value, as well as some quantities that will be reused in subsequent calculations.
 
 ``` {.c++ language="c++" style="lgeneral"}
 T_partials_return logp(0.0);
@@ -503,7 +566,7 @@ T_partials_return logp(0.0);
   size_t max_size_seq_view = max_size(n, r, alpha, beta);
 ```
 
-Determines whether support for incoming observations is valid
+Determines whether support for incoming observations is valid.
 
 ``` {.c++ language="c++" style="lgeneral"}
 for (size_t i = 0; i < max_size_seq_view; i++) {
@@ -552,7 +615,7 @@ $$\log f(y, r, \alpha ,\beta)= \left[ \frac {\mathrm {B} (r+y,\alpha +\beta )}{\
   }
 ```
 
-Compute derivative with respect to $r$, $\alpha$ and $\beta$, on the basis of needs
+Compute derivative with respect to $r$, $\alpha$ and $\beta$, on the basis of needs.
 
 $$\begin{aligned}
 \frac{\partial \log f}{\partial r} &= \psi(y+r) - \psi(y+r+\alpha+\beta) - \psi(r) + \psi(r+\alpha) \\
@@ -634,7 +697,7 @@ $$\begin{aligned}
   }
 ```
 
-Build the return value
+Build the return value.
 
 ``` {.c++ language="c++" style="lgeneral"}
 for (size_t i = 0; i < max_size_seq_view; i++) {
@@ -655,7 +718,7 @@ for (size_t i = 0; i < max_size_seq_view; i++) {
   return ops_partials.build(logp);
 ```
 
-For pmf/pdf functions, overload the template function defined above. This version of the function template does not include the `propto` parameter (default to false). It provides a simpler interface.
+For pmf/pdf functions, we have to overload the template function defined above. This version of the function template does not include the `propto` parameter (default to false). It provides a simpler interface, which is used for direct function calls.
 
 ``` {.c++ language="c++" style="lgeneral"}
 template <typename T_n, typename T_r, typename T_size1, typename T_size2>
@@ -670,7 +733,21 @@ inline stan::return_type_t<T_r, T_size1, T_size2> beta_neg_binomial_lpmf(const T
 
 ## `beta_neg_binomial_lccdf`
 
-We've seen that `beta_neg_binomial_lccdf` and `beta_neg_binomial_lcdf` are close, so let's look at `beta_neg_binomial_lccdf`.
+Since `beta_neg_binomial_lccdf` and `beta_neg_binomial_lcdf` are close in terms of formulation:
+
+$$F(r,\alpha,\beta) = 1 - C(r,\alpha,\beta)$$
+
+$$\begin{aligned}
+    \frac{\partial \log F(r,\alpha,\beta)}{\partial r} &= \frac{\partial \log [1 - C(r,\alpha,\beta)]}{\partial r}\\
+     &= - \frac{1}{1 - C(r,\alpha,\beta)} \frac{\partial C(r,\alpha,\beta)}{\partial r} \\
+     &= - \frac{1}{1 - C(r,\alpha,\beta)} \frac{\partial \log C(r,\alpha,\beta)}{\partial r} C(r,\alpha,\beta).
+\end{aligned}$$
+
+Let's explain the structure of `beta_neg_binomial_lccdf` in detail.
+
+Looking further at the specific expressions, we found that there are two difficulties in the implementation of lccdf, namely ${}_3F_2$ and its derivatives $\frac{\partial {}_3F_2(...)}{\partial \boldsymbol{\theta}}$. Luckily, we have `hypergeometric_3F2` and `grad_F32` in Stan Math Library. See docs in and .
+
+Likewise, first declare the function
 
 ``` {.c++ language="c++" style="lgeneral"}
 template <typename T_n, typename T_r, typename T_size1, typename T_size2>
@@ -683,7 +760,7 @@ stan::return_type_t<T_size1, T_size2> beta_neg_binomial_lccdf(const T_n& n,
 }
 ```
 
-Import
+Make import
 
 ``` {.c++ language="c++" style="lgeneral"}
 using stan::partials_return_t;
@@ -792,6 +869,17 @@ $$\begin{aligned}
 &+ \frac{\partial \log {}_3F_2(...)}{\partial \beta} - \psi(\beta) + \psi(\alpha+\beta)
 \end{aligned}$$
 
+where
+
+$$\begin{aligned}
+    \frac{\partial \log {}_3F_2(...)}{\partial r}
+    &= \left[ _3F_2(...)^{(\{0,1,0\},\{0,0\},0)}(...) + _3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...) \right]  / _3F_2(...) \\
+\frac{\partial \log {}_3F_2(...)}{\partial \alpha} 
+&=  {}_3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...)  / {}_3F_2(...) \\
+\frac{\partial \log {}_3F_2(...)}{\partial \beta}
+&= \left[ _3F_2(...)^{(\{0,0,1\},\{0,0\},0)}(...) + _3F_2(...)^{(\{0,0,0\},\{0,1\},0)}(...) \right]  / _3F_2(...)
+  \end{aligned}$$
+
 ``` {.c++ language="c++" style="lgeneral"}
 T_partials_return digamma_abrn
         = is_constant_all<T_r, T_size1, T_size2>::value
@@ -827,6 +915,86 @@ Finally
 return ops_partials.build(P);
 ```
 
+## `beta_neg_binomial_rng`
+
+In the following we describe the random number generator. $Y \sim \text{BNB}(r,\alpha,\beta)$ is the same as
+
+$$\begin{aligned}
+  Y &\sim \text{NB}(r,p) \\
+  p &\sim {\textrm {Beta}}(\alpha ,\beta ),
+  \end{aligned}$$
+
+We first sample $p$ from the beta distribution then sample $Y$ from the negative binomial distribution. Stan provides functions to generate random numbers from these two distributions. We just need to pay attention to parameterization.
+
+In Stan, the negative binomial distribution is given by
+
+$$\text{NegBinomial}(y~|~\alpha,\beta)  = \binom{y +
+\alpha - 1}{y} \, \left( \frac{\beta}{\beta+1}
+\right)^{\!\alpha} \, \left( \frac{1}{\beta + 1} \right)^{\!y} \!.$$
+
+In our case $$f(y~|~r,p)  = \binom {y+r-1}{y} (1-p)^{y} p^{r}.$$
+
+Through observation, the meaning of $r$ is the same. We have to solve for $p$. $$p = \frac{\beta}{\beta+1} \Rightarrow \beta = \frac{p}{1-p}$$
+
+Therefore, provided $r, \alpha, \beta$, we generate $p \sim {\textrm {Beta}}(\alpha ,\beta )$ and then sample $Y \sim \text{NB}(r, \frac{p}{1-p})$.
+
+In the implementation, because this is a random number generating function, we don't need to consider Stan's unique automatic differentiation type of vector, only scalars and `std::vector`. So the code is relatively simple.
+
+Routinely perform shape and range checks.
+
+``` {.c++ language="c++" style="lgeneral"}
+template <typename T_r, typename T_shape1, typename T_shape2, class RNG>
+inline typename stan::VectorBuilder<true, int, T_r, T_shape1, T_shape2>::type
+beta_neg_binomial_rng(const T_r &r, const T_shape1 &alpha, const T_shape2 &beta,
+                  RNG &rng, std::ostream* pstream__) {
+
+  using stan::ref_type_t;
+  using stan::VectorBuilder;
+  using namespace stan::math;
+
+  using T_r_ref = ref_type_t<T_r>;
+  using T_alpha_ref = ref_type_t<T_shape1>;
+  using T_beta_ref = ref_type_t<T_shape2>;
+  static const char *function = "beta_neg_binomial_rng";
+  check_consistent_sizes(function, "Number of failure parameter", r,
+                         "Prior success parameter", alpha,
+                         "Prior failure parameter", beta);
+
+  T_r_ref r_ref = r;
+  T_alpha_ref alpha_ref = alpha;
+  T_beta_ref beta_ref = beta;
+  check_positive_finite(function, "Number of failure parameter", r_ref);
+  check_positive_finite(function, "Prior success parameter", alpha_ref);
+  check_positive_finite(function, "Prior failure parameter", beta_ref);
+```
+
+Use `beta_rng` to generate $p$. Then compute odds ratio $p/(1-p)$.
+
+``` {.c++ language="c++" style="lgeneral"}
+using T_p = decltype(beta_rng(alpha_ref, beta_ref, rng));
+  T_p p = beta_rng(alpha_ref, beta_ref, rng);
+
+  T_p odds_ratio_p;
+
+  if (std::is_same<T_p, double>::value) {
+    // Scalar case
+    odds_ratio_p = p / (1 - p);
+  } else {
+    // Vector case
+    odds_ratio_p.resize(p.size());
+    for (size_t i = 0; i < p.size(); i++) {
+      odds_ratio_p[i] = p[i] / (1 - p[i]);
+    }
+  } 
+```
+
+Use `neg_binomial_rng` to sample $y$.
+
+``` {.c++ language="c++" style="lgeneral"}
+return neg_binomial_rng(r_ref, odds_ratio_p, rng);
+}   
+```
+
 # Performance test
 
 Then we compare the performance of precomputing gradients and using automatic differentiation on simulated datasets. We sampled $N=10000$ points form $\text{BNB}(6,2,0.5)$. The theoretical mean is $\frac{6\cdot 0.5}{2-1}=3$. The sample mean is 2.99. and the sample variance is 103.85. We run the following model with three global parameters with standard normal priors. To prevent potential identification problems, we constrain $\beta$ to be less than $r$.
@@ -842,7 +1010,7 @@ We ran 1000 iterations on one chain, the table below shows the parameter estimat
 
 The total time of the pure Stan code with automatic differentiation is about 2 times that of the C++ code. The forward time is 37% more that that of the C++ code, which means that although the Stan code will be transpiled to C++, it is still slower than a typical C++ implementation. After using the analytic derivative, the backward pass time is reduced by 4 orders of magnitude (17000 times faster), already very close to zero. Also, the space occupation of chained automatic differentiation by pure Stan is 4-5 orders of magnitude higher than that of C++, see the Chain stacks entries. The No chain stack implemented by C++ is zero, because analytic derivatives make Stan not need to allocate additional storage space for the intermediate results of forward propagation for reverse mode automatic differentiation.
 
-| Metric | C++ Model | Stan Model |
+| Metric | With C++ | Pure Stan |
 | ------ | --------- | ---------- |
 | **Likelihood** |  |  |
 | Total time (s) | 62.6521 | 143.977 |
@@ -867,5 +1035,9 @@ The total time of the pure Stan code with automatic differentiation is about 2 t
 
 
 <center>Performance analysis comparison between C++ analytic derivative implementation and Stan's built-in automatic differentiation implementation.</center>
+
+# Unit test
+
+To do.
 
 [^1]: <https://mc-stan.org/docs/cmdstan-guide/stan_csv.html>
